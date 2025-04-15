@@ -97,7 +97,7 @@ export async function proveTube(pathToBB: string, workingDirectory: string, logg
     throw new Error('Failed to prove tube');
   }
 
-  const tubeVK = await extractVkData(tubeResult.vkPath!);
+  const tubeVK = await extractVkData(tubeResult.vkDirectoryPath!);
   const tubeProof = await readProofAsFields(tubeResult.proofPath!, tubeVK, TUBE_PROOF_LENGTH, logger);
 
   // Sanity check the tube proof
@@ -132,7 +132,7 @@ async function proveRollupCircuit<T extends UltraHonkFlavor, ProofLength extends
     throw new Error(`Failed to generate proof for ${name} with flavor ${flavor}`);
   }
 
-  const vk = await extractVkData(proofResult.vkPath!);
+  const vk = await extractVkData(proofResult.vkDirectoryPath!);
   const proof = await readProofAsFields(proofResult.proofPath!, vk, proofLength, logger);
 
   await verifyProofWithKey(pathToBB, workingDirectory, vk, proof.binaryProof, flavor, logger);
@@ -201,9 +201,11 @@ export async function proveAvm(
   }
 
   const avmProofPath = proofRes.proofPath;
-  const avmVkPath = proofRes.vkPath;
+  const avmVkDirectoryPath = proofRes.vkDirectoryPath;
   expect(avmProofPath).toBeDefined();
-  expect(avmVkPath).toBeDefined();
+  expect(avmVkDirectoryPath).toBeDefined();
+
+  const avmVkPath = path.join(proofRes.vkDirectoryPath as string, VK_FILENAME);
 
   // Read the binary proof
   const avmProofBuffer = await fs.readFile(avmProofPath!);
