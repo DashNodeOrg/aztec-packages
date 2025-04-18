@@ -12,10 +12,50 @@ use crate::{
         public_call_request::PublicCallRequest,
         tree_snapshots::TreeSnapshots,
     },
-    address::AztecAddress,
+    address::{AztecAddress, EthAddress},
     constants::{
-        AVM_CIRCUIT_PUBLIC_INPUTS_LENGTH, AVM_VERIFICATION_KEY_LENGTH_IN_FIELDS,
-        MAX_ENQUEUED_CALLS_PER_TX,
+        AVM_CIRCUIT_PUBLIC_INPUTS_LENGTH, AVM_NUM_PUBLIC_INPUT_COLUMNS,
+        AVM_PUBLIC_INPUTS_COLUMNS_COMBINED_LENGTH, AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH,
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_DATA_WRITES_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_LOGS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_GAS_USED_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_FEE_PAYER_ROW_IDX, AVM_PUBLIC_INPUTS_GAS_SETTINGS_GAS_LIMITS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_FEES_PER_GAS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_PRIORITY_FEES_PER_GAS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GAS_SETTINGS_TEARDOWN_GAS_LIMITS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_BLOCK_NUMBER_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_CHAIN_ID_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_COINBASE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_FEE_RECIPIENT_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_GAS_FEES_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_SLOT_NUMBER_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_TIMESTAMP_ROW_IDX,
+        AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_VERSION_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PUBLIC_APP_LOGIC_CALL_REQUESTS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PUBLIC_SETUP_CALL_REQUESTS_ROW_IDX,
+        AVM_PUBLIC_INPUTS_PUBLIC_TEARDOWN_CALL_REQUEST_ROW_IDX, AVM_PUBLIC_INPUTS_REVERTED_ROW_IDX,
+        AVM_PUBLIC_INPUTS_START_GAS_USED_ROW_IDX,
+        AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX,
+        AVM_PUBLIC_INPUTS_TRANSACTION_FEE_ROW_IDX, AVM_VERIFICATION_KEY_LENGTH_IN_FIELDS,
+        MAX_ENQUEUED_CALLS_PER_TX, PUBLIC_LOG_DATA_SIZE_IN_FIELDS,
     },
     proof::{avm_proof::AvmProof, traits::Verifiable, vk_data::VkData},
     traits::{Deserialize, Empty, FromField, Serialize, ToField},
@@ -180,6 +220,261 @@ impl Deserialize<AVM_CIRCUIT_PUBLIC_INPUTS_LENGTH> for AvmCircuitPublicInputs {
     }
 }
 
+impl AvmCircuitPublicInputs {
+    pub fn to_columns(
+        self,
+    ) -> [[Field; AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH]; AVM_NUM_PUBLIC_INPUT_COLUMNS] {
+        // TODO(dbanks12): assertions!
+        let mut cols: [[Field; AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH]; AVM_NUM_PUBLIC_INPUT_COLUMNS] =
+            [[0; AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH]; AVM_NUM_PUBLIC_INPUT_COLUMNS];
+        // Global variables
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_CHAIN_ID_ROW_IDX] =
+            self.global_variables.chain_id;
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_VERSION_ROW_IDX] = self.global_variables.version;
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_BLOCK_NUMBER_ROW_IDX] =
+            self.global_variables.block_number;
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_SLOT_NUMBER_ROW_IDX] =
+            self.global_variables.slot_number;
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_TIMESTAMP_ROW_IDX] =
+            self.global_variables.timestamp as Field;
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_COINBASE_ROW_IDX] =
+            self.global_variables.coinbase.to_field();
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_FEE_RECIPIENT_ROW_IDX] =
+            self.global_variables.fee_recipient.to_field();
+        // Gas fees
+        cols[0][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_GAS_FEES_ROW_IDX] =
+            self.global_variables.gas_fees.fee_per_da_gas;
+        cols[1][AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_GAS_FEES_ROW_IDX] =
+            self.global_variables.gas_fees.fee_per_l2_gas;
+
+        // Start tree snapshots
+        cols[0][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX] =
+            self.start_tree_snapshots.l1_to_l2_message_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX] =
+            self.start_tree_snapshots.l1_to_l2_message_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX] =
+            self.start_tree_snapshots.note_hash_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX] =
+            self.start_tree_snapshots.note_hash_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX] =
+            self.start_tree_snapshots.nullifier_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX] =
+            self.start_tree_snapshots.nullifier_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX] =
+            self.start_tree_snapshots.public_data_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_START_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX] =
+            self.start_tree_snapshots.public_data_tree.next_available_leaf_index as Field;
+
+        // Start gas used
+        cols[0][AVM_PUBLIC_INPUTS_START_GAS_USED_ROW_IDX] = self.start_gas_used.da_gas as Field;
+        cols[1][AVM_PUBLIC_INPUTS_START_GAS_USED_ROW_IDX] = self.start_gas_used.l2_gas as Field;
+
+        // Gas settings
+        cols[0][AVM_PUBLIC_INPUTS_GAS_SETTINGS_GAS_LIMITS_ROW_IDX] =
+            self.gas_settings.gas_limits.da_gas as Field;
+        cols[1][AVM_PUBLIC_INPUTS_GAS_SETTINGS_GAS_LIMITS_ROW_IDX] =
+            self.gas_settings.gas_limits.l2_gas as Field;
+        cols[0][AVM_PUBLIC_INPUTS_GAS_SETTINGS_TEARDOWN_GAS_LIMITS_ROW_IDX] =
+            self.gas_settings.teardown_gas_limits.da_gas as Field;
+        cols[1][AVM_PUBLIC_INPUTS_GAS_SETTINGS_TEARDOWN_GAS_LIMITS_ROW_IDX] =
+            self.gas_settings.teardown_gas_limits.l2_gas as Field;
+        cols[0][AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_FEES_PER_GAS_ROW_IDX] =
+            self.gas_settings.max_fees_per_gas.fee_per_da_gas;
+        cols[1][AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_FEES_PER_GAS_ROW_IDX] =
+            self.gas_settings.max_fees_per_gas.fee_per_l2_gas;
+        cols[0][AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_PRIORITY_FEES_PER_GAS_ROW_IDX] =
+            self.gas_settings.max_priority_fees_per_gas.fee_per_da_gas;
+        cols[1][AVM_PUBLIC_INPUTS_GAS_SETTINGS_MAX_PRIORITY_FEES_PER_GAS_ROW_IDX] =
+            self.gas_settings.max_priority_fees_per_gas.fee_per_l2_gas;
+
+        // Fee payer
+        cols[0][AVM_PUBLIC_INPUTS_FEE_PAYER_ROW_IDX] = self.fee_payer.to_field();
+
+        // Public setup call requests
+        for i in 0..self.public_setup_call_requests.len() {
+            let row = AVM_PUBLIC_INPUTS_PUBLIC_SETUP_CALL_REQUESTS_ROW_IDX + i;
+            cols[0][row] = self.public_setup_call_requests[i].msg_sender.to_field();
+            cols[1][row] = self.public_setup_call_requests[i].contract_address.to_field();
+            cols[2][row] = self.public_setup_call_requests[i].is_static_call as Field;
+            cols[3][row] = self.public_setup_call_requests[i].calldata_hash;
+        }
+
+        // Public app logic call requests
+        for i in 0..self.public_app_logic_call_requests.len() {
+            let row = AVM_PUBLIC_INPUTS_PUBLIC_APP_LOGIC_CALL_REQUESTS_ROW_IDX + i;
+            cols[0][row] = self.public_app_logic_call_requests[i].msg_sender.to_field();
+            cols[1][row] = self.public_app_logic_call_requests[i].contract_address.to_field();
+            cols[2][row] = self.public_app_logic_call_requests[i].is_static_call as Field;
+            cols[3][row] = self.public_app_logic_call_requests[i].calldata_hash;
+        }
+
+        // Public teardown call request
+        let row = AVM_PUBLIC_INPUTS_PUBLIC_TEARDOWN_CALL_REQUEST_ROW_IDX;
+        cols[0][row] = self.public_teardown_call_request.msg_sender.to_field();
+        cols[1][row] = self.public_teardown_call_request.contract_address.to_field();
+        cols[2][row] = self.public_teardown_call_request.is_static_call as Field;
+        cols[3][row] = self.public_teardown_call_request.calldata_hash;
+
+        // Previous non-revertible accumulated data lengths
+        cols[0][AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_non_revertible_accumulated_data_array_lengths.note_hashes as Field;
+        cols[1][AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_non_revertible_accumulated_data_array_lengths.nullifiers as Field;
+        cols[2][AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_non_revertible_accumulated_data_array_lengths.l2_to_l1_msgs as Field;
+
+        // Previous revertible accumulated data array lengths
+        cols[0][AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_revertible_accumulated_data_array_lengths.note_hashes as Field;
+        cols[1][AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_revertible_accumulated_data_array_lengths.nullifiers as Field;
+        cols[2][AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_ARRAY_LENGTHS_ROW_IDX] =
+            self.previous_revertible_accumulated_data_array_lengths.l2_to_l1_msgs as Field;
+
+        // Previous non-revertible accumulated data
+        // note hashes
+        for i in 0..self.previous_non_revertible_accumulated_data.note_hashes.len() {
+            let row =
+                AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX + i;
+            cols[0][row] = self.previous_non_revertible_accumulated_data.note_hashes[i];
+        }
+        // nullifiers
+        for i in 0..self.previous_non_revertible_accumulated_data.nullifiers.len() {
+            let row =
+                AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX + i;
+            cols[0][row] = self.previous_non_revertible_accumulated_data.nullifiers[i];
+        }
+        // l2_to_l1_msgs
+        for i in 0..self.previous_non_revertible_accumulated_data.l2_to_l1_msgs.len() {
+            let row = AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX
+                + i;
+            cols[0][row] = self.previous_non_revertible_accumulated_data.l2_to_l1_msgs[i]
+                .message
+                .recipient
+                .to_field();
+            cols[1][row] =
+                self.previous_non_revertible_accumulated_data.l2_to_l1_msgs[i].message.content;
+            cols[2][row] = self.previous_non_revertible_accumulated_data.l2_to_l1_msgs[i]
+                .message
+                .counter as Field;
+            cols[3][row] = self.previous_non_revertible_accumulated_data.l2_to_l1_msgs[i]
+                .contract_address
+                .to_field();
+        }
+
+        // Previous revertible accumulated data
+        // note hashes
+        for i in 0..self.previous_revertible_accumulated_data.note_hashes.len() {
+            let row =
+                AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX + i;
+            cols[0][row] = self.previous_revertible_accumulated_data.note_hashes[i];
+        }
+        // nullifiers
+        for i in 0..self.previous_revertible_accumulated_data.nullifiers.len() {
+            let row = AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX + i;
+            cols[0][row] = self.previous_revertible_accumulated_data.nullifiers[i];
+        }
+        // l2_to_l1_msgs
+        for i in 0..self.previous_revertible_accumulated_data.l2_to_l1_msgs.len() {
+            let row =
+                AVM_PUBLIC_INPUTS_PREVIOUS_REVERTIBLE_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX + i;
+            cols[0][row] = self.previous_revertible_accumulated_data.l2_to_l1_msgs[i]
+                .message
+                .recipient
+                .to_field();
+            cols[1][row] =
+                self.previous_revertible_accumulated_data.l2_to_l1_msgs[i].message.content;
+            cols[2][row] =
+                self.previous_revertible_accumulated_data.l2_to_l1_msgs[i].message.counter as Field;
+            cols[3][row] = self.previous_revertible_accumulated_data.l2_to_l1_msgs[i]
+                .contract_address
+                .to_field();
+        }
+
+        // End tree snapshots
+        cols[0][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX] =
+            self.end_tree_snapshots.l1_to_l2_message_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_L1_TO_L2_MESSAGE_TREE_ROW_IDX] =
+            self.end_tree_snapshots.l1_to_l2_message_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX] =
+            self.end_tree_snapshots.note_hash_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NOTE_HASH_TREE_ROW_IDX] =
+            self.end_tree_snapshots.note_hash_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX] =
+            self.end_tree_snapshots.nullifier_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_NULLIFIER_TREE_ROW_IDX] =
+            self.end_tree_snapshots.nullifier_tree.next_available_leaf_index as Field;
+        cols[0][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX] =
+            self.end_tree_snapshots.public_data_tree.root;
+        cols[1][AVM_PUBLIC_INPUTS_END_TREE_SNAPSHOTS_PUBLIC_DATA_TREE_ROW_IDX] =
+            self.end_tree_snapshots.public_data_tree.next_available_leaf_index as Field;
+
+        // End gas used
+        cols[0][AVM_PUBLIC_INPUTS_END_GAS_USED_ROW_IDX] = self.end_gas_used.da_gas as Field;
+        cols[1][AVM_PUBLIC_INPUTS_END_GAS_USED_ROW_IDX] = self.end_gas_used.l2_gas as Field;
+
+        // End accumulated data
+        // note hashes
+        for i in 0..self.accumulated_data.note_hashes.len() {
+            let row = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX + i;
+            cols[0][row] = self.accumulated_data.note_hashes[i];
+        }
+        // nullifiers
+        for i in 0..self.accumulated_data.nullifiers.len() {
+            let row = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NULLIFIERS_ROW_IDX + i;
+            cols[0][row] = self.accumulated_data.nullifiers[i];
+        }
+        // l2_to_l1_msgs
+        for i in 0..self.accumulated_data.l2_to_l1_msgs.len() {
+            let row = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX + i;
+            cols[0][row] = self.accumulated_data.l2_to_l1_msgs[i].message.recipient.to_field();
+            cols[1][row] = self.accumulated_data.l2_to_l1_msgs[i].message.content;
+            cols[2][row] = self.accumulated_data.l2_to_l1_msgs[i].message.counter as Field;
+            cols[3][row] = self.accumulated_data.l2_to_l1_msgs[i].contract_address.to_field();
+        }
+        // public logs
+        for i in 0..self.accumulated_data.public_logs.len() {
+            let first_row_for_log = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_LOGS_ROW_IDX
+                + (i * PUBLIC_LOG_DATA_SIZE_IN_FIELDS);
+            for j in 0..PUBLIC_LOG_DATA_SIZE_IN_FIELDS {
+                // always set contract address in col 0 so that some entry in the row is always non-zero
+                cols[0][first_row_for_log + j] =
+                    self.accumulated_data.public_logs[i].contract_address.to_field();
+                // and set the actual log data entry
+                cols[1][first_row_for_log + j] = self.accumulated_data.public_logs[i].log.fields[j];
+            }
+        }
+        // public data writes
+        for i in 0..self.accumulated_data.public_data_writes.len() {
+            let row = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_DATA_WRITES_ROW_IDX + i;
+            cols[0][row] = self.accumulated_data.public_data_writes[i].leaf_slot;
+            cols[1][row] = self.accumulated_data.public_data_writes[i].value;
+        }
+
+        // transaction fee
+        cols[0][AVM_PUBLIC_INPUTS_TRANSACTION_FEE_ROW_IDX] = self.transaction_fee;
+
+        // reverted
+        cols[0][AVM_PUBLIC_INPUTS_REVERTED_ROW_IDX] = self.reverted as Field;
+
+        // return
+        cols
+    }
+
+    pub fn to_columns_flat(self) -> [Field; AVM_PUBLIC_INPUTS_COLUMNS_COMBINED_LENGTH] {
+        let mut flat = [0; AVM_PUBLIC_INPUTS_COLUMNS_COMBINED_LENGTH];
+
+        let cols = self.to_columns();
+        for col in 0..AVM_NUM_PUBLIC_INPUT_COLUMNS {
+            for row in 0..AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH {
+                flat[col * AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH + row] = cols[col][row];
+            }
+        }
+
+        flat
+    }
+}
+
 pub struct AvmProofData {
     pub public_inputs: AvmCircuitPublicInputs,
     pub proof: AvmProof,
@@ -198,4 +493,117 @@ fn serialization_of_empty_avm_circuit_public_inputs() {
     let serialized = item.serialize();
     let deserialized = AvmCircuitPublicInputs::deserialize(serialized);
     assert(item.eq(deserialized));
+}
+
+#[test]
+fn flat_columns_of_empty_avm_circuit_public_inputs() {
+    let item = AvmCircuitPublicInputs::empty();
+    let flat = item.to_columns_flat();
+    // some assertion just to make sure it isn't optimized away
+    assert(flat.len() == AVM_PUBLIC_INPUTS_COLUMNS_COMBINED_LENGTH);
+}
+
+#[test]
+fn flat_columns_of_avm_circuit_public_inputs() {
+    // Create a test instance with specific values
+    let mut item = AvmCircuitPublicInputs::empty();
+
+    // Set some values in different parts of the struct to test serialization
+    // Global variables - beginning of the struct
+    item.global_variables.chain_id = 123;
+    item.global_variables.block_number = 456;
+    item.global_variables.timestamp = 789;
+
+    // Fee payer - middle of the struct
+    item.fee_payer = AztecAddress::from_field(12345);
+
+    // revertible l2_to_l1_msgs from private
+    item.previous_non_revertible_accumulated_data.l2_to_l1_msgs[0].message.recipient =
+        EthAddress::from_field(1234);
+    item.previous_non_revertible_accumulated_data.l2_to_l1_msgs[0].message.content = 5678;
+    item.previous_non_revertible_accumulated_data.l2_to_l1_msgs[0].message.counter = 9012;
+    item.previous_non_revertible_accumulated_data.l2_to_l1_msgs[0].contract_address =
+        AztecAddress::from_field(3456);
+
+    // Test some array elements
+    // Add a note hash to accumulated data
+    item.accumulated_data.note_hashes[2] = 54321;
+
+    // Add a public log
+    item.accumulated_data.public_logs[0].contract_address = AztecAddress::from_field(11223);
+    // set some number of items in the log (less than max)
+    for j in 0..PUBLIC_LOG_DATA_SIZE_IN_FIELDS - 2 {
+        item.accumulated_data.public_logs[0].log.fields[j] = 10000 + j as Field;
+    }
+
+    // Add a public data write
+    item.accumulated_data.public_data_writes[1].leaf_slot = 5555;
+    item.accumulated_data.public_data_writes[1].value = 6666;
+
+    // End gas used - toward the end of the struct
+    item.end_gas_used.da_gas = 5000;
+    item.end_gas_used.l2_gas = 7000;
+
+    // Transaction fee - at the end of the struct
+    item.transaction_fee = 9876;
+    item.reverted = true;
+
+    // Serialize to columns
+    let flat = item.to_columns_flat();
+
+    // Verify length
+    // Define column offsets
+    let col0_offset = 0;
+    let col1_offset = col0_offset + AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH;
+    let col2_offset = col1_offset + AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH;
+    let col3_offset = col2_offset + AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH;
+
+    // Verify serialized values are at the expected positions
+
+    // Global variables
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_CHAIN_ID_ROW_IDX], 123);
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_BLOCK_NUMBER_ROW_IDX], 456);
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_GLOBAL_VARIABLES_TIMESTAMP_ROW_IDX], 789);
+
+    // Fee payer
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_FEE_PAYER_ROW_IDX], 12345);
+
+    // test l2_to_l1_msgs which use up 4 columns
+    let l2_to_l1_msg_row =
+        AVM_PUBLIC_INPUTS_PREVIOUS_NON_REVERTIBLE_ACCUMULATED_DATA_L2_TO_L1_MSGS_ROW_IDX;
+    assert_eq(flat[col0_offset + l2_to_l1_msg_row], 1234);
+    assert_eq(flat[col1_offset + l2_to_l1_msg_row], 5678);
+    assert_eq(flat[col2_offset + l2_to_l1_msg_row], 9012);
+    assert_eq(flat[col3_offset + l2_to_l1_msg_row], 3456);
+
+    // Array elements
+    // Note hash array
+    assert_eq(
+        flat[col0_offset + AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX + 2],
+        54321,
+    );
+
+    // Public logs
+    let public_log_row = AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_LOGS_ROW_IDX;
+    for j in 0..PUBLIC_LOG_DATA_SIZE_IN_FIELDS - 2 {
+        assert_eq(flat[col1_offset + public_log_row + j], 10000 + j as Field);
+    }
+
+    // Public data writes
+    let public_data_write_row =
+        AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_PUBLIC_DATA_WRITES_ROW_IDX + 1;
+    assert_eq(flat[col0_offset + public_data_write_row], 5555);
+    assert_eq(flat[col1_offset + public_data_write_row], 6666);
+
+    // Pick a an unset/empty element and confirm that it is zero
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX], 0);
+    assert_eq(flat[col1_offset + AVM_PUBLIC_INPUTS_END_ACCUMULATED_DATA_NOTE_HASHES_ROW_IDX], 0);
+
+    // End gas used
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_END_GAS_USED_ROW_IDX], 5000);
+    assert_eq(flat[col1_offset + AVM_PUBLIC_INPUTS_END_GAS_USED_ROW_IDX], 7000);
+
+    // Transaction fee and reverted status
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_TRANSACTION_FEE_ROW_IDX], 9876);
+    assert_eq(flat[col0_offset + AVM_PUBLIC_INPUTS_REVERTED_ROW_IDX], 1);
 }
