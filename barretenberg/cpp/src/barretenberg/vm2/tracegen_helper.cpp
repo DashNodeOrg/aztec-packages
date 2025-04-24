@@ -42,7 +42,7 @@ using namespace bb::avm2::tracegen;
 
 namespace {
 
-auto build_precomputed_columns_jobs(TraceContainer& trace)
+auto build_precomputed_columns_jobs(TraceContainer& trace, const PublicInputs& public_inputs)
 {
     return std::vector<std::function<void()>>{
         [&]() {
@@ -72,6 +72,10 @@ auto build_precomputed_columns_jobs(TraceContainer& trace)
                            precomputed_builder.process_to_radix_p_decompositions(trace));
             AVM_TRACK_TIME("tracegen/precomputed/memory_tag_ranges",
                            precomputed_builder.process_memory_tag_range(trace));
+            AVM_TRACK_TIME("tracegen/precomputed/public_inputs_aux",
+                           precomputed_builder.process_public_inputs_aux(trace));
+            AVM_TRACK_TIME("tracegen/precomputed/public_inputs",
+                           precomputed_builder.process_public_inputs(trace, public_inputs));
         },
     };
 }
@@ -153,7 +157,7 @@ template <typename T> std::vector<T> concatenate_jobs(std::vector<T>&& first, au
 
 } // namespace
 
-TraceContainer AvmTraceGenHelper::generate_trace(EventsContainer&& events)
+TraceContainer AvmTraceGenHelper::generate_trace(EventsContainer&& events, const PublicInputs& public_inputs)
 {
     TraceContainer trace;
 
@@ -161,7 +165,7 @@ TraceContainer AvmTraceGenHelper::generate_trace(EventsContainer&& events)
     {
         auto jobs = concatenate(
             // Precomputed column jobs.
-            build_precomputed_columns_jobs(trace),
+            build_precomputed_columns_jobs(trace, public_inputs),
             // Subtrace jobs.
             std::vector<std::function<void()>>{
                 [&]() {
@@ -313,10 +317,10 @@ TraceContainer AvmTraceGenHelper::generate_trace(EventsContainer&& events)
     return trace;
 }
 
-TraceContainer AvmTraceGenHelper::generate_precomputed_columns()
+TraceContainer AvmTraceGenHelper::generate_precomputed_columns(const PublicInputs& public_inputs)
 {
     TraceContainer trace;
-    auto jobs = build_precomputed_columns_jobs(trace);
+    auto jobs = build_precomputed_columns_jobs(trace, public_inputs);
     execute_jobs(jobs);
     return trace;
 }
