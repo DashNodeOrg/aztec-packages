@@ -20,8 +20,6 @@ AvmProvingInputs AvmProvingInputs::from(const std::vector<uint8_t>& data)
     return inputs;
 }
 
-// TODO(dbanks12): should this actually be a 2D array?
-// std::array<std::array<FF, AVM_PUBLIC_INPUTS_COLUMNS_MAX_LENGTH>, AVM_NUM_PUBLIC_INPUT_COLUMNS>
 std::vector<std::vector<FF>> PublicInputs::to_columns() const
 {
     std::vector<std::vector<FF>> cols(AVM_NUM_PUBLIC_INPUT_COLUMNS,

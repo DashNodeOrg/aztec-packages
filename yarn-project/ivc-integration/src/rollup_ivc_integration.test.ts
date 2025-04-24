@@ -2,6 +2,7 @@ import { BB_RESULT, verifyClientIvcProof, writeClientIVCProofToOutputDirectory }
 import { ROLLUP_HONK_VERIFICATION_KEY_LENGTH_IN_FIELDS, TUBE_PROOF_LENGTH } from '@aztec/constants';
 import { Fr } from '@aztec/foundation/fields';
 import { createLogger } from '@aztec/foundation/log';
+import { mapAvmCircuitPublicInputsToNoir } from '@aztec/noir-protocol-circuits-types/server';
 import { AvmTestContractArtifact } from '@aztec/noir-test-contracts.js/AvmTest';
 import { PublicTxSimulationTester } from '@aztec/simulator/public/fixtures';
 import type { AvmCircuitPublicInputs } from '@aztec/stdlib/avm';
@@ -19,7 +20,6 @@ import {
   MockRollupMergeCircuit,
   generate3FunctionTestingIVCStack,
   mapAvmProofToNoir,
-  mapAvmPublicInputsToNoir,
   mapAvmVerificationKeyToNoir,
   mapRecursiveProofToNoir,
   mapVerificationKeyToNoir,
@@ -148,7 +148,7 @@ describe('Rollup IVC Integration', () => {
       },
       verification_key: mapAvmVerificationKeyToNoir(avmVK),
       proof: mapAvmProofToNoir(avmProof),
-      pub_cols_flattened: mapAvmPublicInputsToNoir(avmPublicInputs),
+      public_inputs: mapAvmCircuitPublicInputsToNoir(avmPublicInputs),
     });
 
     const publicBaseProof = await proveRollupHonk(
