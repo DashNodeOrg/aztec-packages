@@ -32,29 +32,34 @@ export class DebugLog extends Instruction {
   }
 
   public async execute(context: AvmContext): Promise<void> {
-    const memory = context.machineState.memory;
-    const operands = [this.messageOffset, this.fieldsOffset, this.fieldsSizeOffset];
-    const addressing = Addressing.fromWire(this.indirect, operands.length);
-    const [messageOffset, fieldsOffset, fieldsSizeOffset] = addressing.resolve(operands, memory);
+    // DebugLog is a no-op (pc++) except when doing client-initiated simulation
+    if (context.environment.clientInitiatedSimulation) {
+      const memory = context.machineState.memory;
+      const operands = [this.messageOffset, this.fieldsOffset, this.fieldsSizeOffset];
+      const addressing = Addressing.fromWire(this.indirect, operands.length);
+      const [messageOffset, fieldsOffset, fieldsSizeOffset] = addressing.resolve(operands, memory);
 
-    memory.checkTag(TypeTag.UINT32, fieldsSizeOffset);
-    const fieldsSize = memory.get(fieldsSizeOffset).toNumber();
+      memory.checkTag(TypeTag.UINT32, fieldsSizeOffset);
+      const fieldsSize = memory.get(fieldsSizeOffset).toNumber();
 
-    const rawMessage = memory.getSlice(messageOffset, this.messageSize);
-    const fields = memory.getSlice(fieldsOffset, fieldsSize);
+      const rawMessage = memory.getSlice(messageOffset, this.messageSize);
+      const fields = memory.getSlice(fieldsOffset, fieldsSize);
 
-    memory.checkTagsRange(TypeTag.UINT8, messageOffset, this.messageSize);
-    memory.checkTagsRange(TypeTag.FIELD, fieldsOffset, fieldsSize);
+      memory.checkTagsRange(TypeTag.UINT8, messageOffset, this.messageSize);
+      memory.checkTagsRange(TypeTag.FIELD, fieldsOffset, fieldsSize);
 
-    context.machineState.consumeGas(this.gasCost(this.messageSize + fieldsSize));
+      // Interpret str<N> = [u8; N] to string.
+      const messageAsStr = rawMessage.map(field => String.fromCharCode(field.toNumber())).join('');
+      const formattedStr = applyStringFormatting(
+        messageAsStr,
+        fields.map(field => field.toFr()),
+      );
 
-    // Interpret str<N> = [u8; N] to string.
-    const messageAsStr = rawMessage.map(field => String.fromCharCode(field.toNumber())).join('');
-    const formattedStr = applyStringFormatting(
-      messageAsStr,
-      fields.map(field => field.toFr()),
-    );
+      DebugLog.logger.verbose(formattedStr);
+    }
 
-    DebugLog.logger.verbose(formattedStr);
+    // Despite having dynamic "size" operands, the gas cost is fixed because
+    // this opcode is a no-op (pc++) except during client-initiated simulation
+    context.machineState.consumeGas(this.gasCost());
   }
 }
