@@ -21,16 +21,157 @@
 namespace bb::avm2 {
 
 ////////////////////////////////////////////////////////////////////////////
-// Public Inputs
+// Misc Aztec Types
+////////////////////////////////////////////////////////////////////////////
+
+using AztecAddress = FF;
+// In typescript the EthAddress is a byte vector, but in our circuit implementation
+// it's represented as a field element for simplicity
+using EthAddress = FF;
+
+struct L2ToL1Message {
+    EthAddress recipient;
+    FF content;
+    uint32_t counter;
+
+    bool operator==(const L2ToL1Message& other) const = default;
+
+    MSGPACK_FIELDS(recipient, content, counter);
+};
+
+struct ScopedL2ToL1Message {
+    L2ToL1Message message;
+    AztecAddress contractAddress;
+
+    bool operator==(const ScopedL2ToL1Message& other) const = default;
+
+    MSGPACK_FIELDS(message, contractAddress);
+};
+
+struct PublicLog {
+    AztecAddress contractAddress;
+    std::array<FF, PUBLIC_LOG_DATA_SIZE_IN_FIELDS> log;
+
+    bool operator==(const PublicLog& other) const = default;
+
+    MSGPACK_FIELDS(contractAddress, log);
+};
+
+struct PublicDataWrite {
+    FF leafSlot;
+    FF value;
+
+    bool operator==(const PublicDataWrite& other) const = default;
+
+    MSGPACK_FIELDS(leafSlot, value);
+};
+
+////////////////////////////////////////////////////////////////////////////
+// Gas Types
+////////////////////////////////////////////////////////////////////////////
+
+struct GasFees {
+    FF feePerDaGas;
+    FF feePerL2Gas;
+
+    bool operator==(const GasFees& other) const = default;
+
+    MSGPACK_FIELDS(feePerDaGas, feePerL2Gas);
+};
+
+struct Gas {
+    uint32_t l2Gas;
+    uint32_t daGas;
+
+    bool operator==(const Gas& other) const = default;
+
+    MSGPACK_FIELDS(l2Gas, daGas);
+};
+
+struct GasSettings {
+    Gas gasLimits;
+    Gas teardownGasLimits;
+    GasFees maxFeesPerGas;
+    GasFees maxPriorityFeesPerGas;
+
+    bool operator==(const GasSettings& other) const = default;
+
+    MSGPACK_FIELDS(gasLimits, teardownGasLimits, maxFeesPerGas, maxPriorityFeesPerGas);
+};
+
+////////////////////////////////////////////////////////////////////////////
+// Public Call Requests
+////////////////////////////////////////////////////////////////////////////
+
+struct PublicCallRequest {
+    AztecAddress msgSender;
+    AztecAddress contractAddress;
+    bool isStaticCall;
+    FF calldataHash;
+
+    bool operator==(const PublicCallRequest& other) const = default;
+
+    MSGPACK_FIELDS(msgSender, contractAddress, isStaticCall, calldataHash);
+};
+
+////////////////////////////////////////////////////////////////////////////
+// Accumulated Data Types
+////////////////////////////////////////////////////////////////////////////
+
+struct PrivateToAvmAccumulatedDataArrayLengths {
+    uint32_t noteHashes;
+    uint32_t nullifiers;
+    uint32_t l2ToL1Msgs;
+
+    bool operator==(const PrivateToAvmAccumulatedDataArrayLengths& other) const = default;
+
+    MSGPACK_FIELDS(noteHashes, nullifiers, l2ToL1Msgs);
+};
+
+struct PrivateToAvmAccumulatedData {
+    std::array<FF, MAX_NOTE_HASHES_PER_TX> noteHashes;
+    std::array<FF, MAX_NULLIFIERS_PER_TX> nullifiers;
+    std::array<ScopedL2ToL1Message, MAX_L2_TO_L1_MSGS_PER_TX> l2ToL1Msgs;
+
+    bool operator==(const PrivateToAvmAccumulatedData& other) const = default;
+
+    MSGPACK_FIELDS(noteHashes, nullifiers, l2ToL1Msgs);
+};
+
+struct AvmAccumulatedData {
+    std::array<FF, MAX_NOTE_HASHES_PER_TX> noteHashes;
+    std::array<FF, MAX_NULLIFIERS_PER_TX> nullifiers;
+    std::array<ScopedL2ToL1Message, MAX_L2_TO_L1_MSGS_PER_TX> l2ToL1Msgs;
+    std::array<PublicLog, MAX_PUBLIC_LOGS_PER_TX> publicLogs;
+    std::array<PublicDataWrite, MAX_TOTAL_PUBLIC_DATA_UPDATE_REQUESTS_PER_TX> publicDataWrites;
+
+    bool operator==(const AvmAccumulatedData& other) const = default;
+
+    MSGPACK_FIELDS(noteHashes, nullifiers, l2ToL1Msgs, publicLogs, publicDataWrites);
+};
+
+////////////////////////////////////////////////////////////////////////////
+// Global Variables
 ////////////////////////////////////////////////////////////////////////////
 
 struct GlobalVariables {
+    FF chainId;
+    FF version;
     FF blockNumber;
+    FF slotNumber;
+    FF timestamp; // FIXME(dbanks12): should be u64?
+    EthAddress coinbase;
+    AztecAddress feeRecipient;
+    GasFees gasFees;
 
     bool operator==(const GlobalVariables& other) const = default;
 
-    MSGPACK_FIELDS(blockNumber);
+    MSGPACK_FIELDS(chainId, version, blockNumber, slotNumber, timestamp, coinbase, feeRecipient, gasFees);
 };
+
+////////////////////////////////////////////////////////////////////////////
+// Tree Snapshots
+////////////////////////////////////////////////////////////////////////////
 
 struct AppendOnlyTreeSnapshot {
     FF root;
@@ -58,9 +199,31 @@ struct TreeSnapshots {
     MSGPACK_FIELDS(l1ToL2MessageTree, noteHashTree, nullifierTree, publicDataTree);
 };
 
+////////////////////////////////////////////////////////////////////////////
+// Public Inputs
+////////////////////////////////////////////////////////////////////////////
+
 struct PublicInputs {
+    ///////////////////////////////////
+    // Inputs
     GlobalVariables globalVariables;
     TreeSnapshots startTreeSnapshots;
+    Gas startGasUsed;
+    GasSettings gasSettings;
+    AztecAddress feePayer;
+    std::array<PublicCallRequest, MAX_ENQUEUED_CALLS_PER_TX> publicSetupCallRequests;
+    std::array<PublicCallRequest, MAX_ENQUEUED_CALLS_PER_TX> publicAppLogicCallRequests;
+    PublicCallRequest publicTeardownCallRequest;
+    PrivateToAvmAccumulatedDataArrayLengths previousNonRevertibleAccumulatedDataArrayLengths;
+    PrivateToAvmAccumulatedDataArrayLengths previousRevertibleAccumulatedDataArrayLengths;
+    PrivateToAvmAccumulatedData previousNonRevertibleAccumulatedData;
+    PrivateToAvmAccumulatedData previousRevertibleAccumulatedData;
+    ///////////////////////////////////
+    // Outputs
+    TreeSnapshots endTreeSnapshots;
+    Gas endGasUsed;
+    AvmAccumulatedData accumulatedData;
+    FF transactionFee;
     bool reverted;
 
     static PublicInputs from(const std::vector<uint8_t>& data);
@@ -108,7 +271,23 @@ struct PublicInputs {
 
     bool operator==(const PublicInputs& other) const = default;
 
-    MSGPACK_FIELDS(globalVariables, startTreeSnapshots, reverted);
+    MSGPACK_FIELDS(globalVariables,
+                   startTreeSnapshots,
+                   startGasUsed,
+                   gasSettings,
+                   feePayer,
+                   publicSetupCallRequests,
+                   publicAppLogicCallRequests,
+                   publicTeardownCallRequest,
+                   previousNonRevertibleAccumulatedDataArrayLengths,
+                   previousRevertibleAccumulatedDataArrayLengths,
+                   previousNonRevertibleAccumulatedData,
+                   previousRevertibleAccumulatedData,
+                   endTreeSnapshots,
+                   endGasUsed,
+                   accumulatedData,
+                   transactionFee,
+                   reverted);
 };
 
 ////////////////////////////////////////////////////////////////////////////
