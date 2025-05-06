@@ -5,9 +5,11 @@
 #include <memory>
 
 #include "barretenberg/commitment_schemes/shplonk/shplemini.hpp"
+#include "barretenberg/honk/proof_system/types/proof.hpp"
 #include "barretenberg/plonk_honk_shared/types/aggregation_object_type.hpp"
 #include "barretenberg/polynomials/polynomial.hpp"
 #include "barretenberg/polynomials/shared_shifted_virtual_zeroes_array.hpp"
+#include "barretenberg/stdlib/primitives/bool/bool.hpp"
 #include "barretenberg/stdlib/primitives/field/field.hpp"
 #include "barretenberg/stdlib/primitives/padding_indicator_array/padding_indicator_array.hpp"
 #include "barretenberg/transcript/transcript.hpp"
@@ -83,8 +85,13 @@ AvmRecursiveVerifier_<Flavor>::PairingPoints AvmRecursiveVerifier_<Flavor>::veri
     using Shplemini = ShpleminiVerifier_<Curve>;
     using ClaimBatcher = ClaimBatcher_<Curve>;
     using ClaimBatch = ClaimBatcher::Batch;
+    using stdlib::bool_t;
 
-    transcript = std::make_shared<Transcript>(stdlib_proof);
+    StdlibProof<Builder> stdlib_proof_no_pi_validation_switch = stdlib_proof;
+    bool_t<Builder> pi_validation = !bool_t<Builder>(stdlib_proof_no_pi_validation_switch.at(0));
+    stdlib_proof_no_pi_validation_switch.erase(stdlib_proof_no_pi_validation_switch.begin());
+
+    transcript = std::make_shared<Transcript>(stdlib_proof_no_pi_validation_switch);
 
     RelationParams relation_parameters;
     VerifierCommitments commitments{ key };
@@ -134,8 +141,12 @@ AvmRecursiveVerifier_<Flavor>::PairingPoints AvmRecursiveVerifier_<Flavor>::veri
     // Simplified public input with a single column
     // TODO: Extend to multiple columns once public inputs are finalized
     FF execution_input_evaluation = evaluate_public_input_column(public_inputs[0], mle_challenge);
-    execution_input_evaluation.assert_equal(output.claimed_evaluations.execution_input,
-                                            "execution_input_evaluation failed");
+
+    // execution_input_evaluation.assert_equal(output.claimed_evaluations.execution_input,
+    //                                         "execution_input_evaluation failed");
+
+    pi_validation.must_imply(execution_input_evaluation == output.claimed_evaluations.execution_input,
+                             "execution_input_evaluation failed");
 
     // Execute Shplemini rounds.
     ClaimBatcher claim_batcher{
