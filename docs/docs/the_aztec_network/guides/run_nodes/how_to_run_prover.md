@@ -90,6 +90,7 @@ services:
       ETHEREUM_HOSTS: # EL RPC endpoint
       L1_CONSENSUS_HOST_URL: # CL RPC endpoint
       LOG_LEVEL: info
+      P2P_IP:  # YOUR IP ADDRESS
       PROVER_BROKER_HOST: http://broker:8080
       PROVER_PUBLISHER_PRIVATE_KEY: # The node needs to publish proofs to L1. Replace with your private key
     ports:
